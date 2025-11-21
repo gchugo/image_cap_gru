@@ -219,14 +219,15 @@ def greedy_evaluate_transformer(image_path, encoder, decoder, tokenizer, max_len
             
     # Decodificar
     result_tokens = [tokenizer.index_word[i] for i in output.numpy()[0] if i not in [start_token, end_token]]
-    return result_tokens  # Devuelve lista de palabras
+    result_caption = ' '.join(result_tokens)
+    return result_caption  # Devuelve la frase completa
 
 
 def calculate_bleu_score_transformer(encoder, decoder, tokenizer, max_len, test_img_paths, all_captions_dict, sample_size=None):
     actual, predicted = [], []
     eval_paths = test_img_paths[:sample_size] if sample_size else test_img_paths
     for img_path in tqdm(eval_paths):
-        pred_seq, _ = greedy_evaluate_transformer(img_path, encoder, decoder, tokenizer, max_len)
+        pred_seq = greedy_evaluate_transformer(img_path, encoder, decoder, tokenizer, max_len)
         predicted.append(pred_seq)
         
         img_name = os.path.basename(img_path)
