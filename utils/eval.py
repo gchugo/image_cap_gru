@@ -20,7 +20,7 @@ def load_image_for_eval(image_path):
     img = tf.image.decode_jpeg(img, channels=3)
     img = tf.image.resize(img, (224, 224))
     img = tf.keras.applications.resnet50.preprocess_input(img)
-    return img, image_path
+    return img
 
 def greedy_evaluate(image_path, encoder, decoder, tokenizer, max_len):
     """
