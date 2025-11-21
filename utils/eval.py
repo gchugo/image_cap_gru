@@ -228,7 +228,7 @@ def calculate_bleu_score_transformer(encoder, decoder, tokenizer, max_len, test_
     eval_paths = test_img_paths[:sample_size] if sample_size else test_img_paths
     for img_path in tqdm(eval_paths):
         pred_seq = greedy_evaluate_transformer(img_path, encoder, decoder, tokenizer, max_len)
-        predicted.append(pred_seq)
+        predicted.append(pred_seq.split())
         
         img_name = os.path.basename(img_path)
         
