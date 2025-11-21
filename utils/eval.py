@@ -125,7 +125,7 @@ def calculate_metrics_greedy(encoder, decoder, tokenizer, max_len, test_paths, a
     
     return {'bleu1': b1, 'bleu4': b4, 'meteor': avg_meteor, 'rouge': avg_rouge}
 
-ef calculate_bleu_score(encoder, decoder, tokenizer, max_len, test_img_paths, all_captions_dict, sample_size=None):
+def calculate_bleu_score(encoder, decoder, tokenizer, max_len, test_img_paths, all_captions_dict, sample_size=None):
     """
     Calcula los scores BLEU-1 a BLEU-4 para el conjunto de prueba.
     
