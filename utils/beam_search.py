@@ -4,7 +4,7 @@ import numpy as np
 import os
 from tqdm.notebook import tqdm
 from nltk.translate.bleu_score import corpus_bleu
-from utils.eval import load_image_for_eval
+from eval import load_image_for_eval
 from nltk.translate.meteor_score import meteor_score
 from rouge_score import rouge_scorer
 import nltk
