@@ -242,10 +242,10 @@ def calculate_bleu_score_transformer(encoder, decoder, tokenizer, max_len, test_
             
         actual.append(references)
 
-    b1 = corpus_bleu(actual_tokens, predicted_tokens, weights=(1.0, 0, 0, 0))
-    b2 = corpus_bleu(actual_tokens, predicted_tokens, weights=(0.5, 0.5, 0, 0))
-    b3 = corpus_bleu(actual_tokens, predicted_tokens, weights=(0.33, 0.33, 0.33, 0))
-    b4 = corpus_bleu(actual_tokens, predicted_tokens, weights=(0.25, 0.25, 0.25, 0.25))
+    b1 = corpus_bleu(actual, predicted, weights=(1.0, 0, 0, 0))
+    b2 = corpus_bleu(actual, predicted, weights=(0.5, 0.5, 0, 0))
+    b3 = corpus_bleu(actual, predicted, weights=(0.33, 0.33, 0.33, 0))
+    b4 = corpus_bleu(actual, predicte, weights=(0.25, 0.25, 0.25, 0.25))
 
     print(f'\n--- Resultados BLEU ---')
     print(f"BLEU-1:  {b1:.4f}")
