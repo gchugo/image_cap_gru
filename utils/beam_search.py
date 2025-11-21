@@ -224,3 +224,136 @@ def calculate_bleu_beam(encoder, decoder, tokenizer, max_len, test_paths, all_ca
     print(f'BLEU-4: {b4:.4f}')
     
     return b1, b2, b3, b4
+
+def beam_search_evaluate_transformer(image_path, encoder, decoder, tokenizer, max_len, beam_width=3):
+
+    start_token = tokenizer.word_index['<start>']
+    end_token = tokenizer.word_index['<end>']
+
+    # Procesar la imagen
+    img_tensor, _ = load_image_for_eval(image_path)
+    img_tensor = tf.expand_dims(img_tensor, 0)
+
+    # Extraer features del encoder (Transformer)
+    features = encoder(img_tensor, training=False)
+
+    # Inicializar beams: (sequence, score)
+    sequences = [([start_token], 0.0)]
+
+    for _ in range(max_len):
+        all_candidates = []
+
+        for seq, score in sequences:
+
+            if seq[-1] == end_token:
+                all_candidates.append((seq, score))
+                continue
+
+            decoder_in = tf.expand_dims(seq, 0)   # (1, seq_len)
+
+            # Predicción del decoder Transformer
+            predictions = decoder(decoder_in, features, training=False)
+            predictions = predictions[:, -1, :]      # último token
+            predictions = tf.nn.softmax(predictions)
+
+            top_k_probs, top_k_ids = tf.nn.top_k(predictions, k=beam_width)
+
+            for k in range(beam_width):
+                word_id = top_k_ids[0][k].numpy()
+                prob = top_k_probs[0][k].numpy()
+
+                new_seq = seq + [word_id]
+                new_score = score + math.log(prob + 1e-20)
+
+                all_candidates.append((new_seq, new_score))
+
+        # Mantener solo los mejores beams
+        sequences = sorted(all_candidates, key=lambda x: x[1], reverse=True)[:beam_width]
+
+    # Mejor secuencia final
+    best_seq = sequences[0][0]
+
+    # Convertir IDs → palabras
+    caption = [tokenizer.index_word[i] for i in best_seq if i not in [start_token, end_token]]
+
+    return " ".join(caption)
+    
+def calculate_metrics_beam_transformer(
+    encoder, decoder, tokenizer, max_len, test_paths, all_captions_dict,
+    beam_width=5, sample_size=None
+):
+    """
+    Calcula BLEU, METEOR y ROUGE-L usando Beam Search en un Transformer.
+    """
+
+    scorer_rouge = rouge_scorer.RougeScorer(['rougeL'], use_stemmer=True)
+
+    actual_tokens = []
+    predicted_tokens = []
+    meteor_scores = []
+    rouge_scores = []
+
+    eval_paths = test_paths[:sample_size] if sample_size else test_paths
+
+    for img_path in tqdm(eval_paths):
+
+        # --- 1. Predicción Transformer Beam Search ---
+        pred_str = beam_search_evaluate_transformer(
+            img_path, encoder, decoder, tokenizer, max_len, beam_width=beam_width
+        )
+
+        pred_toks = pred_str.split()
+
+        # --- 2. Cargar referencias ---
+        img_name = os.path.basename(img_path)
+        raw_captions = all_captions_dict.get(img_name, [])
+
+        ref_list_tokens = []
+        ref_list_strs = []
+
+        for c in raw_captions:
+            c_clean = c.replace('<start>', '').replace('<end>', '').strip()
+            ref_list_tokens.append(c_clean.split())
+            ref_list_strs.append(c_clean)
+
+        # Acumular para BLEU
+        actual_tokens.append(ref_list_tokens)
+        predicted_tokens.append(pred_toks)
+
+        # --- METEOR ---
+        meteor_scores.append(meteor_score(ref_list_tokens, pred_toks))
+
+        # --- ROUGE-L ---
+        best_rouge = 0
+        for ref in ref_list_strs:
+            score = scorer_rouge.score(ref, pred_str)['rougeL'].fmeasure
+            best_rouge = max(best_rouge, score)
+
+        rouge_scores.append(best_rouge)
+
+    # --- BLEU ---
+    b1 = corpus_bleu(actual_tokens, predicted_tokens, weights=(1.0, 0, 0, 0))
+    b2 = corpus_bleu(actual_tokens, predicted_tokens, weights=(0.5, 0.5, 0, 0))
+    b3 = corpus_bleu(actual_tokens, predicted_tokens, weights=(0.33, 0.33, 0.33, 0))
+    b4 = corpus_bleu(actual_tokens, predicted_tokens, weights=(0.25, 0.25, 0.25, 0.25))
+
+    avg_meteor = np.mean(meteor_scores)
+    avg_rouge = np.mean(rouge_scores)
+
+    # --- PRINT resultados ---
+    print(f"BLEU-1:  {b1:.4f}")
+    print(f"BLEU-2:  {b2:.4f}")
+    print(f"BLEU-3:  {b3:.4f}")
+    print(f"BLEU-4:  {b4:.4f}")
+    print(f"METEOR:  {avg_meteor:.4f}")
+    print(f"ROUGE-L: {avg_rouge:.4f}")
+
+    return {
+        "bleu1": b1,
+        "bleu2": b2,
+        "bleu3": b3,
+        "bleu4": b4,
+        "meteor": avg_meteor,
+        "rouge": avg_rouge
+    }
+
