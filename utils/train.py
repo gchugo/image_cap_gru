@@ -76,7 +76,6 @@ class Trainer:
 def get_optimizer(learning_rate=1e-4):
     return tf.keras.optimizers.Adam(learning_rate=learning_rate)
 
-'''
 # 1. Learning Rate Schedule (OBLIGATORIO para convergencia de Transformers)
 class CustomSchedule(tf.keras.optimizers.schedules.LearningRateSchedule):
     def __init__(self, d_model, warmup_steps=4000):
@@ -109,16 +108,18 @@ class TransformerTrainer:
         return tf.reduce_sum(loss_) / tf.reduce_sum(mask)
 
     def create_masks_decoder(self, tar):
-        # Asegúrate de tener importadas create_look_ahead_mask y create_padding_mask
-        # O defínelas dentro de este archivo o impórtalas de models.decoder_transformer
+        # 1. Máscara de Futuro (Look Ahead)
         look_ahead_mask = create_look_ahead_mask(tf.shape(tar)[1])
+        
+        # 2. Máscara de Padding
         dec_target_padding_mask = create_padding_mask(tar)
-        combined_mask = tf.maximum(dec_target_padding_mask, look_ahead_mask)
+        
+        # 3. Combinar: Queremos que sea True solo si AMBAS son True
+        # (Es decir, permitir atención si es pasado Y no es padding)
+        combined_mask = tf.logical_and(look_ahead_mask, dec_target_padding_mask)
         return combined_mask
-
-    # NOTA: Si estás en local y te daba error de grafo, prueba sin @tf.function primero.
-    # Si quieres velocidad, descoméntalo, pero Keras 3 a veces da guerra con @tf.function manual.
-    # @tf.function 
+        
+       # IMPORTANTE: Sin @tf.function para máxima compatibilidad en local
     def train_step(self, img_tensor, target):
         tar_inp = target[:, :-1]
         tar_real = target[:, 1:]
@@ -126,17 +127,15 @@ class TransformerTrainer:
         combined_mask = self.create_masks_decoder(tar_inp)
 
         with tf.GradientTape() as tape:
-            # Llamada al Encoder
             img_features = self.encoder(img_tensor, training=True)
             
-            # Llamada al Decoder (CORREGIDA PARA KERAS 3)
-            # Pasamos argumentos por nombre
+            # Pasamos argumentos con nombre (Keyword Arguments)
             predictions, _ = self.decoder(
                 tar_inp, 
-                enc_output=img_features,    # <--- Keyword argument
-                training=True,              # <--- Keyword argument
-                look_ahead_mask=combined_mask, # <--- Keyword argument
-                padding_mask=None           # <--- Keyword argument
+                enc_output=img_features, 
+                training=True, 
+                look_ahead_mask=combined_mask, 
+                padding_mask=None
             )
 
             loss = self.loss_function(tar_real, predictions)
@@ -145,24 +144,20 @@ class TransformerTrainer:
         self.optimizer.apply_gradients(zip(gradients, self.encoder.trainable_variables + self.decoder.trainable_variables))
 
         return loss
-    
-    # @tf.function
+
     def validate_step(self, img_tensor, target):
         tar_inp = target[:, :-1]
         tar_real = target[:, 1:]
         combined_mask = self.create_masks_decoder(tar_inp)
-
+        
         img_features = self.encoder(img_tensor, training=False)
         
-        # Llamada al Decoder (CORREGIDA PARA KERAS 3)
         predictions, _ = self.decoder(
             tar_inp, 
-            enc_output=img_features,    # <--- Keyword argument
-            training=False,             # <--- Keyword argument
-            look_ahead_mask=combined_mask, # <--- Keyword argument
-            padding_mask=None           # <--- Keyword argument
+            enc_output=img_features, 
+            training=False, 
+            look_ahead_mask=combined_mask, 
+            padding_mask=None
         )
-        
         loss = self.loss_function(tar_real, predictions)
         return loss
-    '''
