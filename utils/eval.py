@@ -8,7 +8,7 @@ from tqdm.notebook import tqdm
 from nltk.translate.meteor_score import meteor_score
 from rouge_score import rouge_scorer
 import nltk
-from models.decoder_transformer import create_look_ahead_mask
+from decoder_transformer import create_look_ahead_mask
 try:
     nltk.data.find('corpora/wordnet.zip')
 except LookupError:
