@@ -145,7 +145,7 @@ def calculate_bleu_score(encoder, decoder, tokenizer, max_len, test_img_paths, a
     for img_path in tqdm(eval_paths):
         # 1. Generar predicción del modelo
         # Nota: evaluate devuelve (result, attention_plot), solo queremos result
-        pred_seq, _ = greedy_evaluate(img_path, encoder, decoder, tokenizer, max_len)
+        pred_seq  = greedy_evaluate(img_path, encoder, decoder, tokenizer, max_len)
         predicted.append(pred_seq)
         
         # 2. Obtener referencias reales
