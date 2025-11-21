@@ -320,4 +320,4 @@ def calculate_metrics_greedy_transformer(encoder, decoder, tokenizer, max_len, t
     print(f"METEOR:  {avg_meteor:.4f}")
     print(f"ROUGE-L: {avg_rouge:.4f}")
     
-    return {'bleu1': b1, 'bleu4': b4, 'meteor': avg_meteor, 'rouge': avg_rouge}
+    return {'bleu1': b1, 'bleu2': b2, 'bleu3': b3, 'bleu4': b4, 'meteor': avg_meteor, 'rouge': avg_rouge}
