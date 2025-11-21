@@ -19,7 +19,7 @@ class Trainer:
         loss_ *= mask
         return tf.reduce_mean(loss_)
 
-    # @tf.function  # Ahora SÍ funciona bien aquí
+    @tf.function  # Ahora SÍ funciona bien aquí
     def train_step(self, img_tensor, target, start_token_id):
         loss = 0
         
@@ -46,7 +46,7 @@ class Trainer:
 
         return total_loss
     
-    # @tf.function
+    @tf.function
     def validate_step(self, img_tensor, target, start_token_id):
         """
         Calcula el loss de validación sin actualizar pesos.
