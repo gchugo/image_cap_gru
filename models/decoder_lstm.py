@@ -64,8 +64,10 @@ class RNN_Decoder(tf.keras.Model):
         x = self.embedding(x)  # (batch, 1, embedding_dim)
 
         # 3. Pasar el embedding SOLO por la GRU
-        output, state = self.gru(x, initial_state=hidden)
-        # output: (batch, 1, units)
+        gru_output = self.gru(x, initial_state=hidden)
+        output = gru_output[0]
+        state = gru_output[1]
+
 
         # 4. Concatenar salida del GRU con contexto
         x = tf.concat([output, tf.expand_dims(context_vector, 1)], axis=-1)
