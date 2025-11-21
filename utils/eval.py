@@ -242,11 +242,82 @@ def calculate_bleu_score_transformer(encoder, decoder, tokenizer, max_len, test_
             
         actual.append(references)
 
-    b1 = corpus_bleu(actual, predicted, weights=(1.0, 0, 0, 0))
-    b4 = corpus_bleu(actual, predicted, weights=(0.25, 0.25, 0.25, 0.25))
+    b1 = corpus_bleu(actual_tokens, predicted_tokens, weights=(1.0, 0, 0, 0))
+    b2 = corpus_bleu(actual_tokens, predicted_tokens, weights=(0.5, 0.5, 0, 0))
+    b3 = corpus_bleu(actual_tokens, predicted_tokens, weights=(0.33, 0.33, 0.33, 0))
+    b4 = corpus_bleu(actual_tokens, predicted_tokens, weights=(0.25, 0.25, 0.25, 0.25))
 
     print(f'\n--- Resultados BLEU ---')
-    print(f'BLEU-1: {b1:.4f}')
-    print(f'BLEU-4: {b4:.4f}')
+    print(f"BLEU-1:  {b1:.4f}")
+    print(f"BLEU-2:  {b2:.4f}")
+    print(f"BLEU-3:  {b3:.4f}")
+    print(f"BLEU-4:  {b4:.4f}")
     
     return b1, b4
+
+def calculate_metrics_greedy_transformer(encoder, decoder, tokenizer, max_len, test_paths, all_captions_dict, sample_size=None):
+    """
+    Calcula BLEU, METEOR y ROUGE-L usando Greedy Search para Transformer.
+    """
+    scorer_rouge = rouge_scorer.RougeScorer(['rougeL'], use_stemmer=True)
+    
+    actual_tokens = []
+    predicted_tokens = []
+    meteor_scores = []
+    rouge_scores = []
+    
+    eval_paths = test_paths[:sample_size] if sample_size else test_paths
+
+    for img_path in tqdm(eval_paths):
+        # 1. Generar Predicción (GREEDY con TRANSFORMER)
+        pred_str = greedy_evaluate_transformer(
+            img_path, encoder, decoder, tokenizer, max_len
+        )
+        pred_toks = pred_str.split()
+        
+        # 2. Obtener Referencias
+        img_name = os.path.basename(img_path)
+        raw_captions = all_captions_dict.get(img_name, [])
+        
+        ref_list_tokens = []
+        ref_list_strs = []
+        
+        for c in raw_captions:
+            c_clean = c.replace('<start>', '').replace('<end>', '').strip()
+            ref_list_strs.append(c_clean)
+            ref_list_tokens.append(c_clean.split())
+            
+        actual_tokens.append(ref_list_tokens)
+        predicted_tokens.append(pred_toks)
+        
+        # METEOR
+        m_score = meteor_score(ref_list_tokens, pred_toks)
+        meteor_scores.append(m_score)
+        
+        # ROUGE-L
+        best_rouge = 0
+        for ref in ref_list_strs:
+            scores = scorer_rouge.score(ref, pred_str)
+            if scores['rougeL'].fmeasure > best_rouge:
+                best_rouge = scores['rougeL'].fmeasure
+        rouge_scores.append(best_rouge)
+
+    # BLEU
+    b1 = corpus_bleu(actual_tokens, predicted_tokens, weights=(1.0, 0, 0, 0))
+    b2 = corpus_bleu(actual_tokens, predicted_tokens, weights=(0.5, 0.5, 0, 0))
+    b3 = corpus_bleu(actual_tokens, predicted_tokens, weights=(1/3, 1/3, 1/3, 0))
+    b4 = corpus_bleu(actual_tokens, predicted_tokens, weights=(0.25, 0.25, 0.25, 0.25))
+    
+    # METEOR y ROUGE
+    avg_meteor = np.mean(meteor_scores)
+    avg_rouge = np.mean(rouge_scores)
+    
+    # Print
+    print(f"BLEU-1:  {b1:.4f}")
+    print(f"BLEU-2:  {b2:.4f}")
+    print(f"BLEU-3:  {b3:.4f}")
+    print(f"BLEU-4:  {b4:.4f}")
+    print(f"METEOR:  {avg_meteor:.4f}")
+    print(f"ROUGE-L: {avg_rouge:.4f}")
+    
+    return {'bleu1': b1, 'bleu4': b4, 'meteor': avg_meteor, 'rouge': avg_rouge}
