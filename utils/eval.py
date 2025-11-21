@@ -8,6 +8,7 @@ from tqdm.notebook import tqdm
 from nltk.translate.meteor_score import meteor_score
 from rouge_score import rouge_scorer
 import nltk
+from models.decoder_transformer import create_look_ahead_mask
 try:
     nltk.data.find('corpora/wordnet.zip')
 except LookupError:
@@ -76,7 +77,7 @@ def calculate_metrics_greedy(encoder, decoder, tokenizer, max_len, test_paths, a
         
     for img_path in tqdm(eval_paths):
         # 1. Generar Predicción (GREEDY)
-        pred_str = greedy_evaluate_gru(
+        pred_str = greedy_evaluate(
             img_path, encoder, decoder, tokenizer, max_len
         )
         pred_toks = pred_str.split()
@@ -141,13 +142,10 @@ def calculate_bleu_score(encoder, decoder, tokenizer, max_len, test_img_paths, a
     
     # Si queremos probar rápido, limitamos el número de imágenes
     eval_paths = test_img_paths[:sample_size] if sample_size else test_img_paths
-
-    print(f"Calculando BLEU para {len(eval_paths)} imágenes...")
-
     for img_path in tqdm(eval_paths):
         # 1. Generar predicción del modelo
         # Nota: evaluate devuelve (result, attention_plot), solo queremos result
-        pred_seq, _ = evaluate(img_path, encoder, decoder, tokenizer, max_len)
+        pred_seq, _ = greedy_evaluate(img_path, encoder, decoder, tokenizer, max_len)
         predicted.append(pred_seq)
         
         # 2. Obtener referencias reales
@@ -178,6 +176,76 @@ def calculate_bleu_score(encoder, decoder, tokenizer, max_len, test_img_paths, a
     print(f'\n--- Resultados BLEU ---')
     print(f'BLEU-1: {b1:.4f}')
 
+    print(f'BLEU-4: {b4:.4f}')
+    
+    return b1, b4
+
+def greedy_evaluate_transformer(image_path, encoder, decoder, tokenizer, max_len):
+    """Genera un caption usando Greedy Search para Transformer."""
+    # 1. Procesar imagen
+    img = load_image_for_eval(image_path)
+    img = tf.expand_dims(img, 0)
+
+    # 2. Inicializar
+    start_token = tokenizer.word_index['<start>']
+    end_token = tokenizer.word_index['<end>']
+    output = tf.expand_dims([start_token], 0)
+    
+    # 3. Encoder
+    img_features = encoder(img, training=False)
+
+    # 4. Bucle de Generación
+    for i in range(max_len):
+        # Crear máscara (importante importarla o definirla antes)
+        look_ahead_mask = create_look_ahead_mask(tf.shape(output)[1])
+        
+        # Predecir (usando keywords para Keras 3)
+        predictions, _ = decoder(
+            output, 
+            enc_output=img_features, 
+            training=False, 
+            look_ahead_mask=look_ahead_mask, 
+            padding_mask=None
+        )
+        
+        # Última palabra
+        predictions = predictions[:, -1:, :] 
+        predicted_id = tf.argmax(predictions, axis=-1).numpy()[0][0]
+        
+        output = tf.concat([output, tf.expand_dims([predicted_id], 0)], axis=-1)
+        
+        if predicted_id == end_token:
+            break
+            
+    # Decodificar
+    result_tokens = [tokenizer.index_word[i] for i in output.numpy()[0] if i not in [start_token, end_token]]
+    return result_tokens  # Devuelve lista de palabras
+
+
+def calculate_bleu_score_transformer(encoder, decoder, tokenizer, max_len, test_img_paths, all_captions_dict, sample_size=None):
+    actual, predicted = [], []
+    eval_paths = test_img_paths[:sample_size] if sample_size else test_img_paths
+    for img_path in tqdm(eval_paths):
+        pred_seq, _ = greedy_evaluate_transformer(img_path, encoder, decoder, tokenizer, max_len)
+        predicted.append(pred_seq)
+        
+        img_name = os.path.basename(img_path)
+        
+        raw_captions = all_captions_dict[img_name]
+        references = []
+        for c in raw_captions:
+            tokens = c.split()
+            if tokens[0] == '<start>': tokens = tokens[1:]
+            if tokens[-1] == '<end>': tokens = tokens[:-1]
+            references.append(tokens)
+            
+        actual.append(references)
+
+    b1 = corpus_bleu(actual, predicted, weights=(1.0, 0, 0, 0))
+    b4 = corpus_bleu(actual, predicted, weights=(0.25, 0.25, 0.25, 0.25))
+
+    print(f'\n--- Resultados BLEU ---')
+    print(f'BLEU-1: {b1:.4f}')
     print(f'BLEU-4: {b4:.4f}')
     
     return b1, b4
