@@ -1,5 +1,5 @@
 import tensorflow as tf
-from models.decoder_transformer import create_padding_mask, create_look_ahead_mask
+# from models.decoder_transformer import create_padding_mask, create_look_ahead_mask
 
 
 class Trainer:
@@ -76,7 +76,7 @@ class Trainer:
 def get_optimizer(learning_rate=1e-4):
     return tf.keras.optimizers.Adam(learning_rate=learning_rate)
 
-
+'''
 # 1. Learning Rate Schedule (OBLIGATORIO para convergencia de Transformers)
 class CustomSchedule(tf.keras.optimizers.schedules.LearningRateSchedule):
     def __init__(self, d_model, warmup_steps=4000):
@@ -165,3 +165,4 @@ class TransformerTrainer:
         
         loss = self.loss_function(tar_real, predictions)
         return loss
+    '''
